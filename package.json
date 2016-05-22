@@ -1,0 +1,23 @@
+{
+  "name": "rebound-server",
+  "version": "0.0.1",
+  "description": "Rebound Server for Laravel Echo inspired Rebound-client",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leemason/rebound-server.git"
+  },
+  "author": "Lee Mason",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/leemason/rebound-server/issues"
+  },
+  "homepage": "https://github.com/leemason/rebound-server#readme",
+  "dependencies": {
+    "engine.io": "^1.6.9",
+    "superagent": "^2.0.0-alpha.3"
+  }
+}
