@@ -34,11 +34,11 @@ Right now this is done by a simple post route:
 ```php
 <?php
 
-Route::post('/broadcasting/rebound/authenticate', function(\Illuminate\Http\Request $r){
+Route::post('/broadcasting/auth', function(\Illuminate\Http\Request $r){
 
 
-    //socket_id = $r->cookie('io')
-    //channel = $r->input('channel')
+    //socket_id = $r->socket_id
+    //channel_name = $r->channel_name
 
     if(/* not allowed */){
         abort(403);
@@ -48,6 +48,15 @@ Route::post('/broadcasting/rebound/authenticate', function(\Illuminate\Http\Requ
     return ['status' => 'success', 'user' => $r->user()];
 
 });
+
+Route::post('/broadcasting/socket', function(\Illuminate\Http\Request $r){
+
+
+    //cache the socket id against session id $r->socket_id
+
+    return ['status' => 'success'];
+
+});
 ```
 
-But this will be changing soon to intergrate with whatever the final interface is for laravel 5.3 (and there will be a package for it..
+But this will be changing soon to intergrate with whatever the final interface is for laravel 5.3 (and there will be a package for it, if its not intergrated into the core).

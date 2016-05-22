@@ -16,6 +16,9 @@ class Server{
         //attach to http server
         this.attachServer();
 
+        //send socket id to laravel
+        this.saveSocket();
+
         //add sockets on subscibe
         this.onSubscribe();
 
@@ -31,6 +34,29 @@ class Server{
 
     attachServer(){
         this.engine = engine.attach(this.server);
+    }
+
+    saveSocket(){
+        this.on('connection', function(socket){
+
+            socket.on('message', function(data){
+                data = JSON.parse(data);
+                if(data.event == 'socket:csrf' && data.data.hasOwnProperty('token')){
+
+                    socket.csrfToken = data.data.token;
+
+                    superagent.post('/broadcasting/socket')
+                        .set(socket.request.headers)
+                        .send({socket_id: socket.id, '_token': socket.csrfToken})
+                        .end(function(err, res){
+                            if(err || !err && res && res.body.status != 'success'){
+                                console.log(err);
+                                return;
+                            }
+                        }.bind(this));
+                }
+            });
+        });
     }
 
     on(event, cb){
@@ -116,9 +142,11 @@ class Server{
             //verify channel if private or presence??
             if(this.isPrivateChannel(data.channel) || this.isPresenceChannel(data.channel)){
 
-                superagent.post('/broadcasting/rebound/authenticate')
+                //console.log(socket.request);
+
+                superagent.post('/broadcasting/auth')
                     .set(socket.request.headers)
-                    .send({channel: data.channel})
+                    .send({channel_name: data.channel, socket_id: socket.id, '_token': socket.csrfToken})
                     .end(function(err, res){
                         if(err || !err && res && res.body.status != 'success'){
                             console.log(err);
@@ -210,7 +238,7 @@ class Server{
             for(let socket in sockets){
 
                 //dont send if not in channel, or if specified by the event itself via the socket_id property
-                if(!sockets.hasOwnProperty(socket) || sockets.hasOwnProperty(socket) && payload.data.hasOwnProperty('socket_id') && payload.data.socket_id == socket) continue;
+                if(!sockets.hasOwnProperty(socket) || sockets.hasOwnProperty(socket) && payload.data.hasOwnProperty('socket') && payload.data.socket == socket) continue;
 
                 sockets[socket].send(payload);
             }
