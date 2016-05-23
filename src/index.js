@@ -60,6 +60,7 @@ class Server{
                             if(err || !err && res && res.body.status != 'success'){
                                 debug('Socket save error!');
                                 debug(err);
+                                debug(res);
                                 return;
                             }
 
