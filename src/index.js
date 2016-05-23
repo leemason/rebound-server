@@ -7,7 +7,7 @@ var bluebird = require('bluebird');
 
 class Server{
 
-    constructor(srv, redis, cache){
+    constructor(srv, redis, cache, cacheExpires){
 
         this.server = srv;
 
@@ -16,6 +16,8 @@ class Server{
         this.redis = redis;
 
         this.cache = cache;
+
+        this.cacheExpires = (cacheExpires) ? cacheExpires : 86400;
 
         //attach to http server
         this.attachServer();
@@ -183,7 +185,7 @@ class Server{
                 if(err || !err && res && res.body.status != 'success'){
                     debug('Channel authentication error!');
                     debug(err);
-                    this.cache.set('rebound:' + channel + ':' + socket.member.id, 'false');
+                    this.cache.set('rebound:' + channel + ':' + socket.member.id, 'false', 'ex', this.cacheExpires);
                     return;
                 }
 
@@ -201,7 +203,7 @@ class Server{
                 }
 
                 //cache for later
-                this.cache.set('rebound:' + channel + ':' + socket.member.id, JSON.stringify(socket.member.channels[channel]));
+                this.cache.set('rebound:' + channel + ':' + socket.member.id, JSON.stringify(socket.member.channels[channel]), 'ex', this.cacheExpires);
 
             }.bind(this));
 

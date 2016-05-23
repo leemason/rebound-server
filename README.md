@@ -83,7 +83,7 @@ var redis = new Redis();//redis config must match laravel redis config to use th
 var cache = new Redis();//redis config must match etc... this will cache channel auth lookups as rebound:$channel_name:$user_id
 
 
-var srv = new Server(nodeServer, redis, cache);
+var srv = new Server(nodeServer, redis, cache, 1440); //last argument sets the expiry of channel auths - default = 86400 (1 day)
 
 ```
 
