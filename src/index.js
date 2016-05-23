@@ -2,6 +2,7 @@
 
 var engine = require('engine.io');
 var superagent = require('superagent');
+var debug = require('debug')('rebound-server');
 
 class Server{
 
@@ -33,6 +34,7 @@ class Server{
     }
 
     attachServer(){
+        debug('Attaching To Engine.io Server.');
         this.engine = engine.attach(this.server);
     }
 
@@ -42,6 +44,7 @@ class Server{
             socket.on('message', function(data){
                 data = JSON.parse(data);
                 if(data.event == 'socket:csrf' && data.data.hasOwnProperty('token')){
+                    debug('Sending Socket ID for save.');
 
                     socket.csrfToken = data.data.token;
 
@@ -50,7 +53,8 @@ class Server{
                         .send({socket_id: socket.id, '_token': socket.csrfToken})
                         .end(function(err, res){
                             if(err || !err && res && res.body.status != 'success'){
-                                console.log(err);
+                                debug('Socket save error!');
+                                debug(err);
                                 return;
                             }
                         }.bind(this));
@@ -114,6 +118,8 @@ class Server{
 
     addToChannel(socket, channelName){
 
+        debug('Adding ' + socket.id + ' to ' + channelName);
+
         let channel = this.getChannel(channelName);
 
         channel[socket.id] = socket;
@@ -127,6 +133,8 @@ class Server{
     }
 
     sendMemberInfo(channelName, event, member){
+
+        debug('Sending member info for ' + channelName);
 
         let members = this.getChannelMembers(channelName);
 
@@ -152,14 +160,15 @@ class Server{
             //verify channel if private or presence??
             if(this.isPrivateChannel(data.channel) || this.isPresenceChannel(data.channel)){
 
-                //console.log(socket.request);
+                debug('Requesting channel authentication.');
 
                 superagent.post('/broadcasting/auth')
                     .set(socket.request.headers)
                     .send({channel_name: data.channel, socket_id: socket.id, '_token': socket.csrfToken})
                     .end(function(err, res){
                         if(err || !err && res && res.body.status != 'success'){
-                            console.log(err);
+                            debug('Channel authentication error!');
+                            debug(err);
                             return;
                         }
 
@@ -191,6 +200,8 @@ class Server{
 
         this.onEvent('leave', function(data, socket){
 
+            debug('Removing ' + socket.id + ' from ' + data.channel);
+
             //remove socket fom channel
             this.channels[data.channel] = (this.channels.hasOwnProperty(data.channel)) ? this.channels[data.channel] : {};
 
@@ -217,6 +228,8 @@ class Server{
     onClose(){
         this.on('connection', function(socket){
             socket.on('close', function(reason){
+
+                debug('Closing socket.');
 
                 for(let id in this.channels){
 
@@ -248,10 +261,12 @@ class Server{
             // that way we can remove any need to do message security on the front end as we already authenticated.
             let sockets = this.getChannel(channel);
 
+            debug('Sending Event: ' + message.channel + ':' + message.event);
+
             for(let socket in sockets){
 
                 //dont send if not in channel, or if specified by the event itself via the socket_id property
-                if(!sockets.hasOwnProperty(socket) || sockets.hasOwnProperty(socket) && payload.data.hasOwnProperty('socket') && payload.data.socket == socket) continue;
+                if(!sockets.hasOwnProperty(socket) || sockets.hasOwnProperty(socket) && payload.hasOwnProperty('data') && payload.data.hasOwnProperty('socket') && payload.data.socket == socket) continue;
 
                 sockets[socket].send(payload);
             }

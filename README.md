@@ -26,7 +26,7 @@ Route::post('/broadcasting/auth', function(\Illuminate\Http\Request $r){
     }
 
     //return success and what user info you want available in the presence channels under the user key
-    return ['status' => 'success', 'user_id' => $r->user()->, 'user_info' => $r->user()];
+    return ['status' => 'success', 'user_id' => $r->user()->id, 'user_info' => $r->user()];
 
 });
 
@@ -80,6 +80,10 @@ var srv = new Server(nodeServer, redis);
 ```
 
 To start the server just run ```node websocket.js```.
+
+Or if you want to be more verbose you can run with the DEBUG command:
+
+```DEBUG=rebound-server,superagent,engine* node websocket.js```
 
 Long term you would want to run this process via supervisor or something else.
 
