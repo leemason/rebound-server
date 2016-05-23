@@ -89,7 +89,16 @@ class Server{
         let members = {};
 
         for(let mem in this.getChannel(channel)){
-            members[this.channels[channel][mem].id] = this.channels[channel][mem].user;
+
+            if(!members.hasOwnProperty(this.channels[channel][mem].member.id)){
+                members[this.channels[channel][mem].member.id] = this.channels[channel][mem].member;
+                members[this.channels[channel][mem].member.id].socket_ids = [];
+            }
+
+            //add socket ids
+            if(members[this.channels[channel][mem].member.id].socket_ids.indexOf(mem) == -1){
+                members[this.channels[channel][mem].member.id].socket_ids.push(mem);
+            }
         }
 
         return members;
@@ -111,13 +120,13 @@ class Server{
 
         //confirm
         socket.send(JSON.stringify({
-            event: channelName + ':subscribed',
+            event: channelName + ':subscription_succeeded',
             data: {},
             channel: channelName
         }));
     }
 
-    sendMemberInfo(channelName, event){
+    sendMemberInfo(channelName, event, member){
 
         let members = this.getChannelMembers(channelName);
 
@@ -130,6 +139,7 @@ class Server{
             sockets[s].send(JSON.stringify({
                 event: channelName + ':' + event,
                 members: members,
+                member: member,
                 channel: channelName,
                 data: {}
             }));
@@ -153,14 +163,17 @@ class Server{
                             return;
                         }
 
-                        socket.user = res.body.user;
+                        socket.member = {
+                            info: res.body.user_info,
+                            id: res.body.user_id
+                        };
 
                         //add socket to channel - we are authenticated
                         this.addToChannel(socket, data.channel);
 
                         //if presence send member info down
                         if(this.isPresenceChannel(data.channel)){
-                            this.sendMemberInfo(data.channel, 'member_added');
+                            this.sendMemberInfo(data.channel, 'member_added', socket.member);
                         }
 
                     }.bind(this));
@@ -193,7 +206,7 @@ class Server{
 
                 //if presence send member info down
                 if(this.isPresenceChannel(data.channel)){
-                    this.sendMemberInfo(data.channel, 'member_removed');
+                    this.sendMemberInfo(data.channel, 'member_removed', socket.member);
                 }
             }
 

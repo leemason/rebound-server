@@ -26,7 +26,7 @@ Route::post('/broadcasting/auth', function(\Illuminate\Http\Request $r){
     }
 
     //return success and what user info you want available in the presence channels under the user key
-    return ['status' => 'success', 'user' => $r->user()];
+    return ['status' => 'success', 'user_id' => $r->user()->, 'user_info' => $r->user()];
 
 });
 
