@@ -3,16 +3,19 @@
 var engine = require('engine.io');
 var superagent = require('superagent');
 var debug = require('debug')('rebound-server');
+var bluebird = require('bluebird');
 
 class Server{
 
-    constructor(srv, redis){
+    constructor(srv, redis, cache){
 
         this.server = srv;
 
         this.channels = {};
 
         this.redis = redis;
+
+        this.cache = cache;
 
         //attach to http server
         this.attachServer();
@@ -57,6 +60,21 @@ class Server{
                                 debug(err);
                                 return;
                             }
+
+                            //lets store the user id if there is one, this will help with cached channel auth down the line.
+                            if(res.body.hasOwnProperty('user_id')){
+                                socket.member = {
+                                    id: res.body.user_id,
+                                    channels: {}
+                                };
+                            }
+
+                            //confirm
+                            socket.send(JSON.stringify({
+                                event: 'socket:csrf:saved',
+                                data: {}
+                            }));
+
                         }.bind(this));
                 }
             });
@@ -95,7 +113,7 @@ class Server{
         for(let mem in this.getChannel(channel)){
 
             if(!members.hasOwnProperty(this.channels[channel][mem].member.id)){
-                members[this.channels[channel][mem].member.id] = this.channels[channel][mem].member;
+                members[this.channels[channel][mem].member.id] = this.channels[channel][mem].member.channels[channel];
                 members[this.channels[channel][mem].member.id].socket_ids = [];
             }
 
@@ -155,37 +173,87 @@ class Server{
 
     }
 
+    authenticateChannel(channel, socket){
+
+        //run auth post
+        superagent.post('/broadcasting/auth')
+            .set(socket.request.headers)
+            .send({channel_name: channel, socket_id: socket.id, '_token': socket.csrfToken})
+            .end(function(err, res){
+                if(err || !err && res && res.body.status != 'success'){
+                    debug('Channel authentication error!');
+                    debug(err);
+                    this.cache.set('rebound:' + channel + ':' + socket.member.id, 'false');
+                    return;
+                }
+
+                socket.member.channels[channel] = {
+                    info: res.body.user_info,
+                    id: socket.member.id
+                };
+
+                //add socket to channel - we are authenticated
+                this.addToChannel(socket, channel);
+
+                //if presence send member info down
+                if(this.isPresenceChannel(channel)){
+                    this.sendMemberInfo(channel, 'member_added', socket.member.channels[channel]);
+                }
+
+                //cache for later
+                this.cache.set('rebound:' + channel + ':' + socket.member.id, JSON.stringify(socket.member.channels[channel]));
+
+            }.bind(this));
+
+    }
+
     onSubscribe(){
         this.onEvent('subscribe', function(data, socket){
             //verify channel if private or presence??
             if(this.isPrivateChannel(data.channel) || this.isPresenceChannel(data.channel)){
 
-                debug('Requesting channel authentication.');
 
-                superagent.post('/broadcasting/auth')
-                    .set(socket.request.headers)
-                    .send({channel_name: data.channel, socket_id: socket.id, '_token': socket.csrfToken})
-                    .end(function(err, res){
-                        if(err || !err && res && res.body.status != 'success'){
-                            debug('Channel authentication error!');
-                            debug(err);
+                debug('Authentication channel lookup: ' + 'rebound:' + data.channel + ':' + socket.member.id);
+
+                //check for channel auth cache by rebound:channel:user_id
+                this.cache.get('rebound:' + data.channel + ':' + socket.member.id, function(_, result){
+                    if(_){
+
+                        debug('Authentication channel lookup: ' + 'rebound:' + data.channel + ':' + socket.member.id + ' missed');
+
+                        this.authenticateChannel(data.channel, socket);
+
+                    }else{
+
+                        if(result == 'false'){
+                            debug('Authentication channel lookup: ' + 'rebound:' + data.channel + ':' + socket.member.id + ' failed auth, returning.');
                             return;
                         }
 
-                        socket.member = {
-                            info: res.body.user_info,
-                            id: res.body.user_id
-                        };
+                        if(result != null){
+                            debug('Authentication channel lookup: ' + 'rebound:' + data.channel + ':' + socket.member.id + ' hit');
 
-                        //add socket to channel - we are authenticated
-                        this.addToChannel(socket, data.channel);
+                            result = JSON.parse(result);
 
-                        //if presence send member info down
-                        if(this.isPresenceChannel(data.channel)){
-                            this.sendMemberInfo(data.channel, 'member_added', socket.member);
+                            socket.member.channels[data.channel] = result;
+
+                            //add socket to channel - we are authenticated via cache
+                            this.addToChannel(socket, data.channel);
+
+                            //if presence send member info down
+                            if(this.isPresenceChannel(data.channel)){
+                                this.sendMemberInfo(data.channel, 'member_added', socket.member.channels[data.channel]);
+                            }
+
+                            return;
                         }
 
-                    }.bind(this));
+                        //result is null
+                        this.authenticateChannel(data.channel, socket);
+
+                    }
+
+                }.bind(this));
 
             }else{
 
@@ -202,6 +270,10 @@ class Server{
 
             debug('Removing ' + socket.id + ' from ' + data.channel);
 
+            if(socket.member.channels.hasOwnProperty(data.channel)){
+                delete socket.member.channels[data.channel];
+            }
+
             //remove socket fom channel
             this.channels[data.channel] = (this.channels.hasOwnProperty(data.channel)) ? this.channels[data.channel] : {};
 
@@ -217,7 +289,7 @@ class Server{
 
                 //if presence send member info down
                 if(this.isPresenceChannel(data.channel)){
-                    this.sendMemberInfo(data.channel, 'member_removed', socket.member);
+                    this.sendMemberInfo(data.channel, 'member_removed', socket.member.channels[data.channel]);
                 }
             }
 
@@ -239,7 +311,7 @@ class Server{
 
                     //if presence send member info down
                     if(this.isPresenceChannel(id)){
-                        this.sendMemberInfo(id, 'member_removed');
+                        this.sendMemberInfo(id, 'member_removed', {id: null, info: {}});
                     }
                 }
 

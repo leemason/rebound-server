@@ -1,6 +1,6 @@
 {
   "name": "rebound-server",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Rebound Server for Laravel Echo inspired Rebound-client",
   "main": "src/index.js",
   "scripts": {
@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/leemason/rebound-server#readme",
   "dependencies": {
+    "bluebird": "^3.4.0",
     "debug": "^2.2.0",
     "engine.io": "^1.6.9",
     "superagent": "^2.0.0-alpha.3"

@@ -34,6 +34,11 @@ Route::post('/broadcasting/socket', function(\Illuminate\Http\Request $r){
 
     //cache the socket id against session id $r->socket_id
 
+    //must return user id if logged in so we can fetch cache keys
+    if ($r->user()) {
+        return ['status' => 'success', 'user_id' => $r->user()->id];
+    }
+
     return ['status' => 'success'];
 
 });
@@ -65,6 +70,7 @@ var Redis = require('ioredis');
 var Server = require('rebound-server');
 
 
+
 var nodeServer = http.Server(function(req, res){
     res.writeHead(404);
     res.end();
@@ -74,8 +80,10 @@ var nodeServer = http.Server(function(req, res){
 
 var redis = new Redis();//redis config must match laravel redis config to use the same db
 
+var cache = new Redis();//redis config must match etc... this will cache channel auth lookups as rebound:$channel_name:$user_id
 
-var srv = new Server(nodeServer, redis);
+
+var srv = new Server(nodeServer, redis, cache);
 
 ```
 
