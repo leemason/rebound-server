@@ -40,7 +40,9 @@ class Server{
 
     attachServer(){
         debug('Attaching To Engine.io Server.');
-        this.engine = engine.attach(this.server);
+        this.engine = engine.attach(this.server, {
+            path: '/rebound'
+        });
     }
 
     saveSocket(){
